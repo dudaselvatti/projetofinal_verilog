@@ -2,123 +2,123 @@
 
 module tb_projeto_ula;
 
-    // --- SINAIS DE CONEXÃO ---
-    reg clk;
-    reg [2:0] sw_entrada;
-    reg botao_prox; // Simula o KEY[0]
+    // --- 1. SINAIS DE LIGAÇÃO ---
+    reg CLOCK_50;
+    reg [2:0] SW;
+    reg [0:0] KEY; // Definido como vetor para corresponder à entrada do módulo
 
-    // Saídas para observar
-    wire [6:0] seg;
-    wire [1:0] an;
-    wire led_over;
-    wire led_zero;
-    wire led_neg;
-    wire [2:0] leds_debug; // Para ver o estado (0, 1, 2, 3, 4)
+    // Saídas (Fios para observar)
+    wire [6:0] HEX0;
+    wire [6:0] HEX1;
+    wire [6:0] HEX2;
+    wire [6:0] HEX3;
+    wire [6:0] HEX4;
+    wire [6:0] HEX5;
+    wire [9:0] LEDR;
 
-    // --- INSTÂNCIA DO SEU PROJETO (DUT - Device Under Test) ---
+    // --- 2. INSTÂNCIA DO DUT (Device Under Test) ---
     projeto_ula_fsm DUT (
-        .clk(clk),
-        .sw_entrada(sw_entrada),
-        .botao_prox(botao_prox),
-        .seg(seg),
-        .an(an),
-        .led_over(led_over),
-        .led_zero(led_zero),
-        .led_neg(led_neg),
-        .leds_debug(leds_debug)
+        .CLOCK_50(CLOCK_50),
+        .SW(SW),
+        .KEY(KEY),
+        .HEX0(HEX0),
+        .HEX1(HEX1),
+        .HEX2(HEX2),
+        .HEX3(HEX3),
+        .HEX4(HEX4),
+        .HEX5(HEX5),
+        .LEDR(LEDR)
     );
 
-    // --- GERADOR DE CLOCK (50MHz) ---
-    always #10 clk = ~clk; // Inverte a cada 10ns (Período = 20ns)
+    // --- 3. GERADOR DE CLOCK (50MHz) ---
+    always #10 CLOCK_50 = ~CLOCK_50; // Período de 20ns
 
-    // --- TAREFA PARA SIMULAR O CLIQUE NO BOTÃO ---
-    // Como seu código tem detector de borda, precisamos simular o aperto e soltura
-    task apertar_botao;
+    // --- 4. TAREFA PARA SIMULAR O CLIQUE NO BOTÃO ---
+    // Simula o comportamento físico de pressionar e soltar
+    task clicar_botao;
         begin
-            @(negedge clk);
-            botao_prox = 0; // Pressiona (Active Low)
-            #100;           // Segura um pouco
-            @(negedge clk);
-            botao_prox = 1; // Solta
-            #100;           // Espera um pouco antes do próximo passo
+            @(negedge CLOCK_50);
+            KEY[0] = 1'b0; // Pressiona (Active Low)
+            #60;           // Segura durante alguns ciclos de clock
+            @(negedge CLOCK_50);
+            KEY[0] = 1'b1; // Solta
+            #60;           // Espera antes da próxima ação
         end
     endtask
 
-    // --- CENÁRIO DE TESTE ---
+    // --- 5. CENÁRIO DE TESTE ---
     initial begin
-        $dumpfile("ondas.vcd");       // Nome do arquivo de ondas que será gerado
+        // Configuração para o GTKWave
+        $dumpfile("ondas_ula.vcd");
         $dumpvars(0, tb_projeto_ula);
-        // 1. Inicialização
-        clk = 0;
-        botao_prox = 1; // Botão solto
-        sw_entrada = 0;
+
+        // Inicialização
+        CLOCK_50 = 0;
+        KEY[0] = 1; // Botão solto (nível alto)
+        SW = 0;
         
-        $display("--- INICIO DA SIMULACAO ---");
-        #100; // Espera estabilizar
+        $display("=== INICIO DA SIMULACAO ===");
+        #100; // Tempo para estabilização
 
-        // O sistema começa no Estado 0 (Reset).
-        // Vamos realizar a operação: 3 + 1 = 4
-        
-        // -------------------------------------------------------
-        // PASSO 1: Sair do Reset -> Ir para Load A
-        $display("Tempo: %0t | Estado: %d | Acao: Clicar para ir para Load A", $time, leds_debug);
-        apertar_botao(); 
+        // ESTADO 0 -> 1: Ir para Load A
+        $display("Tempo: %0t | Acao: Iniciar (Ir para Load A)", $time);
+        clicar_botao();
 
-        // -------------------------------------------------------
-        // PASSO 2: Carregar A = 3 (011)
-        #50;
-        sw_entrada = 3'b011; // Coloca 3 nos switches
-        #50;
-        $display("Tempo: %0t | Estado: %d | Acao: Carregando A=3", $time, leds_debug);
-        apertar_botao(); // Grava A e vai para Load B
+        // -----------------------------------------------------------
+        // ESTADO 1: Carregar A = 5 (101 binário)
+        // -----------------------------------------------------------
+        #20;
+        SW = 3'b101; 
+        #20;
+        $display("Tempo: %0t | Acao: Definir A=5 e confirmar", $time);
+        // Nota: Neste momento, no GTKWave, deves ver o HEX5 a mudar
+        clicar_botao(); 
 
-        // -------------------------------------------------------
-        // PASSO 3: Carregar B = 1 (001)
-        #50;
-        sw_entrada = 3'b001; // Coloca 1 nos switches
-        #50;
-        $display("Tempo: %0t | Estado: %d | Acao: Carregando B=1", $time, leds_debug);
-        apertar_botao(); // Grava B e vai para Load OP
+        // -----------------------------------------------------------
+        // ESTADO 2: Carregar B = 3 (011 binário)
+        // -----------------------------------------------------------
+        #20;
+        SW = 3'b011;
+        #20;
+        $display("Tempo: %0t | Acao: Definir B=3 e confirmar", $time);
+        // Nota: Neste momento, deves ver o HEX3 a mudar
+        clicar_botao();
 
-        // -------------------------------------------------------
-        // PASSO 4: Carregar OP = SOMA (000)
-        #50;
-        sw_entrada = 3'b000; // Opção 000 é soma
-        #50;
-        $display("Tempo: %0t | Estado: %d | Acao: Carregando OP=Soma", $time, leds_debug);
-        apertar_botao(); // Grava OP e vai para EXECUÇÃO
+        // -----------------------------------------------------------
+        // ESTADO 3: Carregar OP = Multiplicação (010 binário)
+        // -----------------------------------------------------------
+        #20;
+        SW = 3'b010; // Código para Multiplicação
+        #20;
+        $display("Tempo: %0t | Acao: Definir OP=Mult e Executar", $time);
+        clicar_botao();
 
-        // -------------------------------------------------------
-        // PASSO 5: Execução e Verificação
+        // -----------------------------------------------------------
+        // ESTADO 4: Execução
+        // Esperado: 5 * 3 = 15
+        // 15 em decimal é '1' no HEX1 e '5' no HEX0
+        // 15 em binário é 001111 (visível nos LEDR)
+        // -----------------------------------------------------------
         #100;
-        $display("Tempo: %0t | Estado: %d | RESULTADO NOS LEDS (Esperado 4)", $time, leds_debug);
+        $display("Tempo: %0t | RESULTADO CALCULADO", $time);
         
-        // Dica: No visualizador de ondas, olhe para a variável interna 'resultado_final'
-        // pois ler os segmentos 'seg' visualmente é difícil.
-        
-        // -------------------------------------------------------
-        // TESTE EXTRA: Resetar e fazer uma Subtração Negativa (2 - 5)
-        apertar_botao(); // Volta para Reset
-        
-        $display("--- Teste 2: Subtracao Negativa (2 - 5) ---");
-        apertar_botao(); // Vai para Load A
-        
-        sw_entrada = 3'b010; // A = 2
-        apertar_botao();     // Grava A
-        
-        sw_entrada = 3'b101; // B = 5
-        apertar_botao();     // Grava B
-        
-        sw_entrada = 3'b001; // OP = Subtração
-        apertar_botao();     // Executa
-        
-        #100;
-        // Esperado: Resultado 3 (magnitude) e LED_NEG acesso
-        if (led_neg == 1) $display("SUCESSO: Flag Negativo acendeu!");
-        else $display("ERRO: Flag Negativo falhou.");
+        // Verifica se a flag Zero acendeu incorretamente
+        if (LEDR[6] == 1) $display("ERRO: Flag Zero ativa incorretamente.");
+        else $display("SUCESSO: Flag Zero inativa.");
 
-        #200;
-        $stop;
+        // Verifica o resultado binário nos LEDs (bits 0 a 5)
+        if (LEDR[5:0] == 6'd15) $display("SUCESSO: Resultado Binário = 15.");
+        else $display("ERRO: Resultado inesperado: %d", LEDR[5:0]);
+
+        // -----------------------------------------------------------
+        // TESTE DE RESET
+        // -----------------------------------------------------------
+        #50;
+        $display("Tempo: %0t | Acao: Resetar o sistema", $time);
+        clicar_botao();
+
+        #100;
+        $finish;
     end
 
 endmodule
